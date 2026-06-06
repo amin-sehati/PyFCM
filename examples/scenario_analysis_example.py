@@ -5,8 +5,8 @@ Run this script from the command line: python scenario_analysis_example.py
 
 from pyfcm import run_scenario
 
-print("\nThe file location is the path to your single-FCM adjacency matrix Excel file.")
-print("Example: C:/MyProject/Adjacency_matrix.xlsx\n")
+print("\nThe file location is the path to your single-FCM adjacency matrix .xls workbook.")
+print("Example: C:/MyProject/Adjacency_matrix.xls\n")
 
 file_location = input("Paste your project file path here:  ")
 
@@ -19,7 +19,7 @@ noise_threshold = float(input("Noise threshold (e.g. 0.1):  "))
 print("\nInference rules:  k (Kosko)  |  mk (Modified Kosko)  |  r (Rescaled)")
 infer_rule = input("Inference rule:  ")
 
-print("\nSquashing functions:  sig  |  tanh  |  biv  |  triv")
+print("\nSquashing functions:  sig  |  tanh  |  bivalent  |  trivalent")
 function_type = input("Squashing function:  ")
 
 lambda_ = float(input("Lambda parameter (0 to 10):  "))

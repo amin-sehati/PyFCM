@@ -5,8 +5,8 @@ Run this script from the command line: python uncertainty_analysis_example.py
 
 from pyfcm import run_uncertainty
 
-print("\nThe file location is the path to your single-FCM adjacency matrix Excel file.")
-print("Example: C:/MyProject/Adjacency_matrix.xlsx\n")
+print("\nThe file location is the path to your single-FCM adjacency matrix .xls workbook.")
+print("Example: C:/MyProject/Adjacency_matrix.xls\n")
 
 file_location = input("Paste your project file path here:  ")
 

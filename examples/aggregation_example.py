@@ -5,8 +5,8 @@ Run this script from the command line: python aggregation_example.py
 
 from pyfcm import aggregate, visualize_aggregated
 
-print("\nThe file location is the path to your Excel file containing all participants' adjacency matrices.")
-print("Example: C:/MyProject/AllParticipants_Adjacency_Matrix.xlsx")
+print("\nThe file location is the path to your .xls workbook containing all participants' adjacency matrices.")
+print("Example: C:/MyProject/AllParticipants_Adjacency_Matrix.xls")
 print("Each sheet in the file should contain one participant's matrix.\n")
 
 file_location = input("Paste your project file path here:  ")

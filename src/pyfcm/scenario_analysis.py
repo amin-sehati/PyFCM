@@ -5,84 +5,24 @@
          aminpour@msu.edu
 """
 
-import math
-
 import matplotlib.pyplot as plt
-import networkx as nx
 import numpy as np
-import xlrd
+
+from .simulation import infer_scenario, infer_steady, transform_func
+from .workbooks import concept_metadata, read_single_fcm
 
 
 def _transform_func(x, n, f_type, lambda_=1):
-    if f_type == "sig":
-        x_new = np.empty(n)
-        for i in range(n):
-            x_new[i] = 1 / (1 + math.exp(-lambda_ * x[i]))
-        return x_new
-    if f_type == "tanh":
-        x_new = np.empty(n)
-        for i in range(n):
-            x_new[i] = math.tanh(lambda_ * x[i])
-        return x_new
-    if f_type == "biv":
-        x_new = np.empty(n)
-        for i in range(n):
-            x_new[i] = 1 if x[i] > 0 else 0
-        return x_new
-    if f_type == "triv":
-        x_new = np.empty(n)
-        for i in range(n):
-            if x[i] > 0:
-                x_new[i] = 1
-            elif x[i] == 0:
-                x_new[i] = 0
-            else:
-                x_new[i] = -1
-        return x_new
+    return transform_func(x, n, f_type, lambda_)
 
 
 def _infer_steady(adj_matrix, n, init_vec, f_type, infer_rule, lambda_):
-    act_vec_old = init_vec.copy()
-    adj_matrix_t = adj_matrix.T
-    resid = 1
-    ones = np.ones(n) if infer_rule == "r" else None
-    while resid > 0.00001:
-        if infer_rule == "k":
-            x = np.matmul(adj_matrix_t, act_vec_old)
-        elif infer_rule == "mk":
-            x = act_vec_old + np.matmul(adj_matrix_t, act_vec_old)
-        elif infer_rule == "r":
-            shifted_state = 2 * act_vec_old - ones
-            x = shifted_state + np.matmul(adj_matrix_t, shifted_state)
-        else:
-            x = np.zeros(n)
-        act_vec_new = _transform_func(x, n, f_type, lambda_)
-        resid = max(abs(act_vec_new - act_vec_old))
-        act_vec_old = act_vec_new
-    return act_vec_new
+    return infer_steady(adj_matrix, n, init_vec, f_type, infer_rule, lambda_)
 
 
 def _infer_scenario(scenario_concepts, change_level, adj_matrix, n, init_vec, f_type, infer_rule, lambda_):
-    act_vec_old = init_vec.copy()
-    adj_matrix_t = adj_matrix.T
-    resid = 1
-    ones = np.ones(n) if infer_rule == "r" else None
-    while resid > 0.00001:
-        if infer_rule == "k":
-            x = np.matmul(adj_matrix_t, act_vec_old)
-        elif infer_rule == "mk":
-            x = act_vec_old + np.matmul(adj_matrix_t, act_vec_old)
-        elif infer_rule == "r":
-            shifted_state = 2 * act_vec_old - ones
-            x = shifted_state + np.matmul(adj_matrix_t, shifted_state)
-        else:
-            x = np.zeros(n)
-        act_vec_new = _transform_func(x, n, f_type, lambda_)
-        for c in scenario_concepts:
-            act_vec_new[c] = change_level[c]
-        resid = max(abs(act_vec_new - act_vec_old))
-        act_vec_old = act_vec_new
-    return act_vec_new
+    return infer_scenario(scenario_concepts, change_level, adj_matrix, n, init_vec,
+                          f_type, infer_rule, lambda_)
 
 
 def run_scenario(file_location, noise_threshold, infer_rule, function_type, lambda_,
@@ -93,13 +33,13 @@ def run_scenario(file_location, noise_threshold, infer_rule, function_type, lamb
     Parameters
     ----------
     file_location : str
-        Path to the single-participant adjacency matrix Excel file.
+        Path to the single-participant adjacency matrix .xls workbook.
     noise_threshold : float
         Edges with |weight| <= noise_threshold are zeroed out.
     infer_rule : str
         'k', 'mk', or 'r'.
     function_type : str
-        'sig', 'tanh', 'biv', or 'triv'.
+        'sig', 'tanh', 'bivalent', or 'trivalent'.
     lambda_ : float
         Squashing function steepness parameter.
     principles : list of str
@@ -113,25 +53,9 @@ def run_scenario(file_location, noise_threshold, infer_rule, function_type, lamb
     -------
     changes_dic : dict  {concept_name: change_value}
     """
-    workbook = xlrd.open_workbook(file_location)
-    sheet = workbook.sheet_by_index(0)
-    n_concepts = sheet.nrows - 1
-
-    adj_matrix = np.zeros((n_concepts, n_concepts))
+    adj_matrix, sheet, n_concepts = read_single_fcm(file_location, noise_threshold)
     activation_vec = np.ones(n_concepts)
-    node_name = {}
-
-    for i in range(1, n_concepts + 1):
-        for j in range(1, n_concepts + 1):
-            val = sheet.cell_value(i, j)
-            adj_matrix[i - 1, j - 1] = 0 if abs(val) <= noise_threshold else val
-
-    concepts = [sheet.cell_value(0, i) for i in range(1, n_concepts + 1)]
-    G = nx.DiGraph(adj_matrix)
-    for nod in G.nodes():
-        node_name[nod] = sheet.cell_value(nod + 1, 0)
-
-    prin_concepts_index = [nod for nod in node_name if node_name[nod] in principles]
+    concepts, node_name, prin_concepts_index = concept_metadata(sheet, n_concepts, principles)
 
     change_level_by_index = {concepts.index(name): lvl for name, lvl in change_levels.items()}
     scenario_concepts = [concepts.index(name) for name in change_levels]
@@ -163,7 +87,7 @@ def run_scenario(file_location, noise_threshold, infer_rule, function_type, lamb
     plt.savefig('Scenario_Results.pdf')
     plt.show()
 
-    changes_dic = {node_name[nod]: all_changes[nod] for nod in G.nodes()}
+    changes_dic = {node_name[nod]: all_changes[nod] for nod in node_name}
     with open('Changes_In_All_Concepts.csv', 'w') as f:
         for key, value in changes_dic.items():
             f.write('{},{}\n'.format(key, value))

@@ -10,8 +10,49 @@ from statistics import mean, median
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
-import xlrd
 from scipy.stats.mstats import gmean
+
+from .workbooks import read_participant_fcms
+
+
+def aggregate_matrices(matrices, aggregation_technique):
+    aggregation_technique = {"AI": "AMI", "AX": "AMX"}.get(
+        aggregation_technique, aggregation_technique
+    )
+    n_concepts = len(matrices[0])
+
+    adj = np.zeros((n_concepts, n_concepts))
+    count = np.zeros((n_concepts, n_concepts))
+    adj_ag = np.zeros((n_concepts, n_concepts))
+
+    for adj_matrix in matrices:
+        count += adj_matrix != 0
+        adj += adj_matrix
+
+    adj_copy = np.copy(adj)
+
+    if aggregation_technique == "AMX":
+        np.divide(adj_copy, count, out=adj_ag, where=count != 0)
+
+    elif aggregation_technique == "AMI":
+        for i in range(n_concepts):
+            for j in range(n_concepts):
+                weights = [ind[i, j] for ind in matrices]
+                adj_ag[i, j] = mean(weights)
+
+    elif aggregation_technique == "MED":
+        for i in range(n_concepts):
+            for j in range(n_concepts):
+                weights = [ind[i, j] for ind in matrices]
+                adj_ag[i, j] = median(weights)
+
+    elif aggregation_technique == "GM":
+        for i in range(n_concepts):
+            for j in range(n_concepts):
+                weights = [ind[i, j] for ind in matrices if ind[i, j] != 0]
+                adj_ag[i, j] = float(gmean(np.array(weights)))
+
+    return adj_ag
 
 
 def aggregate(file_location, aggregation_technique):
@@ -21,7 +62,7 @@ def aggregate(file_location, aggregation_technique):
     Parameters
     ----------
     file_location : str
-        Path to the Excel file containing individual adjacency matrices (one per sheet).
+        Path to the .xls workbook containing individual adjacency matrices (one per sheet).
     aggregation_technique : str
         'AMX' – arithmetic mean excluding zeros
         'AMI' – arithmetic mean including zeros
@@ -34,49 +75,12 @@ def aggregate(file_location, aggregation_technique):
     last_sheet : xlrd.Sheet  (used for node labels)
     n_concepts : int
     """
-    workbook = xlrd.open_workbook(file_location)
-    sheet = workbook.sheet_by_index(0)
-    n_concepts = sheet.nrows - 1
+    aggregation_technique = {"AI": "AMI", "AX": "AMX"}.get(
+        aggregation_technique, aggregation_technique
+    )
 
-    adj = np.zeros((n_concepts, n_concepts))
-    count = np.zeros((n_concepts, n_concepts))
-    adj_ag = np.zeros((n_concepts, n_concepts))
-    all_adjs = []
-
-    for i in range(workbook.nsheets):
-        sheet = workbook.sheet_by_index(i)
-        adj_matrix = np.zeros((n_concepts, n_concepts))
-        for row in range(1, n_concepts + 1):
-            for col in range(1, n_concepts + 1):
-                weight = sheet.cell_value(row, col)
-                adj_matrix[row - 1, col - 1] = weight
-                if weight != 0:
-                    count[row - 1, col - 1] += 1
-        all_adjs.append(adj_matrix)
-        adj += adj_matrix
-
-    adj_copy = np.copy(adj)
-
-    if aggregation_technique == "AMX":
-        np.divide(adj_copy, count, out=adj_ag, where=count != 0)
-
-    elif aggregation_technique == "AMI":
-        for i in range(n_concepts):
-            for j in range(n_concepts):
-                weights = [ind[i, j] for ind in all_adjs]
-                adj_ag[i, j] = mean(weights)
-
-    elif aggregation_technique == "MED":
-        for i in range(n_concepts):
-            for j in range(n_concepts):
-                weights = [ind[i, j] for ind in all_adjs]
-                adj_ag[i, j] = median(weights)
-
-    elif aggregation_technique == "GM":
-        for i in range(n_concepts):
-            for j in range(n_concepts):
-                weights = [ind[i, j] for ind in all_adjs if ind[i, j] != 0]
-                adj_ag[i, j] = float(gmean(np.array(weights)))
+    _, _, all_adjs, sheet, n_concepts = read_participant_fcms(file_location)
+    adj_ag = aggregate_matrices(all_adjs, aggregation_technique)
 
     return adj_ag, sheet, n_concepts
 

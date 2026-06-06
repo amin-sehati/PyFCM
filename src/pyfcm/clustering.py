@@ -11,86 +11,24 @@ import random
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
-import xlrd
 from sklearn.cluster import KMeans
+
+from .aggregation import aggregate_matrices
+from .simulation import infer_scenario, infer_steady, transform_func
+from .workbooks import read_participant_fcms
 
 
 def _transform_func(x, n, f_type, lambda_=1):
-    if f_type == "sig":
-        x_new = np.empty(n)
-        for i in range(n):
-            x_new[i] = 1 / (1 + math.exp(-lambda_ * x[i]))
-        return x_new
-    if f_type == "tanh":
-        x_new = np.empty(n)
-        for i in range(n):
-            x_new[i] = math.tanh(lambda_ * x[i])
-        return x_new
-    if f_type == "bivalent":
-        x_new = np.empty(n)
-        for i in range(n):
-            x_new[i] = 1 if x[i] > 0 else 0
-        return x_new
-    if f_type == "trivalent":
-        x_new = np.empty(n)
-        for i in range(n):
-            if x[i] > 0:
-                x_new[i] = 1
-            elif x[i] == 0:
-                x_new[i] = 0
-            else:
-                x_new[i] = -1
-        return x_new
+    return transform_func(x, n, f_type, lambda_)
 
 
 def _infer_steady(adj_matrix, n, init_vec=None, f_type="tanh", infer_rule="k"):
-    if init_vec is None:
-        init_vec = np.ones(n)
-    act_vec_old = init_vec.copy()
-    adj_matrix_t = adj_matrix.T
-    resid = 1
-    ones = np.ones(n) if infer_rule == "r" else None
-    while resid > 0.00001:
-        if infer_rule == "k":
-            x = np.matmul(adj_matrix_t, act_vec_old)
-        elif infer_rule == "mk":
-            x = act_vec_old + np.matmul(adj_matrix_t, act_vec_old)
-        elif infer_rule == "r":
-            shifted_state = 2 * act_vec_old - ones
-            x = shifted_state + np.matmul(adj_matrix_t, shifted_state)
-        else:
-            x = np.zeros(n)
-        act_vec_new = _transform_func(x, n, f_type)
-        resid = max(abs(act_vec_new - act_vec_old))
-        if resid < 0.00001:
-            break
-        act_vec_old = act_vec_new
-    return act_vec_new
+    return infer_steady(adj_matrix, n, init_vec, f_type, infer_rule)
 
 
 def _infer_scenario(scenario_concepts, level, adj_matrix, n, init_vec=None, f_type="tanh", infer_rule="k"):
-    if init_vec is None:
-        init_vec = np.ones(n)
-    act_vec_old = init_vec.copy()
-    adj_matrix_t = adj_matrix.T
-    resid = 1
-    ones = np.ones(n) if infer_rule == "r" else None
-    while resid > 0.0001:
-        if infer_rule == "k":
-            x = np.matmul(adj_matrix_t, act_vec_old)
-        elif infer_rule == "mk":
-            x = act_vec_old + np.matmul(adj_matrix_t, act_vec_old)
-        elif infer_rule == "r":
-            shifted_state = 2 * act_vec_old - ones
-            x = shifted_state + np.matmul(adj_matrix_t, shifted_state)
-        else:
-            x = np.zeros(n)
-        act_vec_new = _transform_func(x, n, f_type)
-        for c in scenario_concepts:
-            act_vec_new[c] = level[c]
-        resid = max(abs(act_vec_new - act_vec_old))
-        act_vec_old = act_vec_new
-    return act_vec_new
+    return infer_scenario(scenario_concepts, level, adj_matrix, n, init_vec,
+                          f_type, infer_rule, tolerance=0.0001)
 
 
 def _similarity(agent_fcm, reference_fcm):
@@ -113,21 +51,23 @@ def _similarity(agent_fcm, reference_fcm):
 
 
 def cluster(file_location, aggregation_technique, clustering_method, n_clusters,
-            f_type="tanh", infer_rule="k"):
+            f_type="tanh", infer_rule="k", function_type=None):
     """
     Cluster individual FCMs by structural or dynamic similarity.
 
     Parameters
     ----------
     file_location : str
-        Path to Excel file with one participant adjacency matrix per sheet.
+        Path to .xls workbook with one participant adjacency matrix per sheet.
     aggregation_technique : str
-        How to build the reference FCM: 'AI', 'AX', 'O', or 'Z'.
+        How to build the reference FCM: 'AMI', 'AMX', 'O', or 'Z'.
     clustering_method : str
         'S' for structural (spectral) similarity, 'D' for dynamic similarity.
     n_clusters : int
-    f_type : str
+    function_type : str
         Squashing function for dynamic clustering: 'sig', 'tanh', 'bivalent', 'trivalent'.
+    f_type : str
+        Backward-compatible alias for function_type.
     infer_rule : str
         Inference rule for dynamic clustering: 'k', 'mk', or 'r'.
 
@@ -136,21 +76,10 @@ def cluster(file_location, aggregation_technique, clustering_method, n_clusters,
     clusters : dict  {cluster_id: [similarity_values]}
     assignments : list of (participant_id, cluster_label) tuples
     """
-    workbook = xlrd.open_workbook(file_location)
-    sheet = workbook.sheet_by_index(0)
-    n_concepts = sheet.nrows - 1
-    n_participants = workbook.nsheets
+    if function_type is not None:
+        f_type = function_type
 
-    all_participants = {}
-    participant_ids = []
-    for i in range(n_participants):
-        sheet = workbook.sheet_by_index(i)
-        adj_matrix = np.zeros((n_concepts, n_concepts))
-        for row in range(1, n_concepts + 1):
-            for col in range(1, n_concepts + 1):
-                adj_matrix[row - 1, col - 1] = sheet.cell_value(row, col)
-        participant_ids.append(sheet.cell_value(0, 0))
-        all_participants[sheet.cell_value(0, 0)] = adj_matrix
+    all_participants, participant_ids, matrices, _, n_concepts = read_participant_fcms(file_location)
 
     class Agent:
         def __init__(self, ID):
@@ -182,22 +111,8 @@ def cluster(file_location, aggregation_technique, clustering_method, n_clusters,
         return np.mean(distances)
 
     def make_reference(method):
-        if method == "AI":
-            adj = np.zeros((n_concepts, n_concepts))
-            for ag in agents:
-                adj += nx.to_numpy_array(ag.FCM)
-            return adj / n_participants
-        if method == "AX":
-            adj = np.zeros((n_concepts, n_concepts))
-            count = np.zeros((n_concepts, n_concepts))
-            adj_ag = np.zeros((n_concepts, n_concepts))
-            for ag in agents:
-                adj_matrix = nx.to_numpy_array(ag.FCM)
-                count += adj_matrix != 0
-                adj += adj_matrix
-                adj_copy = np.copy(adj)
-                np.divide(adj_copy, count, out=adj_ag, where=count != 0)
-            return adj_ag
+        if method in ("AMI", "AI", "AMX", "AX"):
+            return aggregate_matrices(matrices, method)
         if method == "O":
             return np.ones((n_concepts, n_concepts))
         if method == "Z":
