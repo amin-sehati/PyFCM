@@ -58,9 +58,7 @@ def aggregate(file_location, aggregation_technique):
     adj_copy = np.copy(adj)
 
     if aggregation_technique == "AMX":
-        for i in range(n_concepts):
-            for j in range(n_concepts):
-                adj_ag[i, j] = 0 if count[i, j] == 0 else adj_copy[i, j] / count[i, j]
+        np.divide(adj_copy, count, out=adj_ag, where=count != 0)
 
     elif aggregation_technique == "AMI":
         for i in range(n_concepts):

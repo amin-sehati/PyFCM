@@ -18,22 +18,22 @@ import xlrd
 
 def _transform_func(x, n, f_type, lambda_=1):
     if f_type == "sig":
-        x_new = np.zeros(n)
+        x_new = np.empty(n)
         for i in range(n):
             x_new[i] = 1 / (1 + math.exp(-lambda_ * x[i]))
         return x_new
     if f_type == "tanh":
-        x_new = np.zeros(n)
+        x_new = np.empty(n)
         for i in range(n):
             x_new[i] = math.tanh(lambda_ * x[i])
         return x_new
     if f_type == "bivalent":
-        x_new = np.zeros(n)
+        x_new = np.empty(n)
         for i in range(n):
             x_new[i] = 1 if x[i] > 0 else 0
         return x_new
     if f_type == "trivalent":
-        x_new = np.zeros(n)
+        x_new = np.empty(n)
         for i in range(n):
             if x[i] > 0:
                 x_new[i] = 1
@@ -48,14 +48,17 @@ def _infer_steady(adj_matrix, n, init_vec, f_type, infer_rule, lambda_):
     act_vec_old = init_vec.copy()
     adj_matrix_t = adj_matrix.T
     resid = 1
+    ones = np.ones(n) if infer_rule == "r" else None
     while resid > 0.00001:
-        x = np.zeros(n)
         if infer_rule == "k":
             x = np.matmul(adj_matrix_t, act_vec_old)
-        if infer_rule == "mk":
+        elif infer_rule == "mk":
             x = act_vec_old + np.matmul(adj_matrix_t, act_vec_old)
-        if infer_rule == "r":
-            x = (2 * act_vec_old - np.ones(n)) + np.matmul(adj_matrix_t, (2 * act_vec_old - np.ones(n)))
+        elif infer_rule == "r":
+            shifted_state = 2 * act_vec_old - ones
+            x = shifted_state + np.matmul(adj_matrix_t, shifted_state)
+        else:
+            x = np.zeros(n)
         act_vec_new = _transform_func(x, n, f_type, lambda_)
         resid = max(abs(act_vec_new - act_vec_old))
         if resid < 0.00001:
@@ -71,14 +74,17 @@ def _infer_scenario(scenario_concepts, zero_concepts, adj_matrix, n, init_vec, f
     random_levels = {concept: random.random() * random.choice([-1, 1]) for concept in scenario_concepts}
 
     resid = 1
+    ones = np.ones(n) if infer_rule == "r" else None
     while resid > 0.00001:
-        x = np.zeros(n)
         if infer_rule == "k":
             x = np.matmul(adj_matrix_t, act_vec_old)
-        if infer_rule == "mk":
+        elif infer_rule == "mk":
             x = act_vec_old + np.matmul(adj_matrix_t, act_vec_old)
-        if infer_rule == "r":
-            x = (2 * act_vec_old - np.ones(n)) + np.matmul(adj_matrix_t, (2 * act_vec_old - np.ones(n)))
+        elif infer_rule == "r":
+            shifted_state = 2 * act_vec_old - ones
+            x = shifted_state + np.matmul(adj_matrix_t, shifted_state)
+        else:
+            x = np.zeros(n)
         act_vec_new = _transform_func(x, n, f_type, lambda_)
         for z in zero_concepts:
             act_vec_new[z] = 0

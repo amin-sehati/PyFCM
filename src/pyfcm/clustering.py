@@ -17,22 +17,22 @@ from sklearn.cluster import KMeans
 
 def _transform_func(x, n, f_type, lambda_=1):
     if f_type == "sig":
-        x_new = np.zeros(n)
+        x_new = np.empty(n)
         for i in range(n):
             x_new[i] = 1 / (1 + math.exp(-lambda_ * x[i]))
         return x_new
     if f_type == "tanh":
-        x_new = np.zeros(n)
+        x_new = np.empty(n)
         for i in range(n):
             x_new[i] = math.tanh(lambda_ * x[i])
         return x_new
     if f_type == "bivalent":
-        x_new = np.zeros(n)
+        x_new = np.empty(n)
         for i in range(n):
             x_new[i] = 1 if x[i] > 0 else 0
         return x_new
     if f_type == "trivalent":
-        x_new = np.zeros(n)
+        x_new = np.empty(n)
         for i in range(n):
             if x[i] > 0:
                 x_new[i] = 1
@@ -49,14 +49,17 @@ def _infer_steady(adj_matrix, n, init_vec=None, f_type="tanh", infer_rule="k"):
     act_vec_old = init_vec.copy()
     adj_matrix_t = adj_matrix.T
     resid = 1
+    ones = np.ones(n) if infer_rule == "r" else None
     while resid > 0.00001:
-        x = np.zeros(n)
         if infer_rule == "k":
             x = np.matmul(adj_matrix_t, act_vec_old)
-        if infer_rule == "mk":
+        elif infer_rule == "mk":
             x = act_vec_old + np.matmul(adj_matrix_t, act_vec_old)
-        if infer_rule == "r":
-            x = (2 * act_vec_old - np.ones(n)) + np.matmul(adj_matrix_t, (2 * act_vec_old - np.ones(n)))
+        elif infer_rule == "r":
+            shifted_state = 2 * act_vec_old - ones
+            x = shifted_state + np.matmul(adj_matrix_t, shifted_state)
+        else:
+            x = np.zeros(n)
         act_vec_new = _transform_func(x, n, f_type)
         resid = max(abs(act_vec_new - act_vec_old))
         if resid < 0.00001:
@@ -71,14 +74,17 @@ def _infer_scenario(scenario_concepts, level, adj_matrix, n, init_vec=None, f_ty
     act_vec_old = init_vec.copy()
     adj_matrix_t = adj_matrix.T
     resid = 1
+    ones = np.ones(n) if infer_rule == "r" else None
     while resid > 0.0001:
-        x = np.zeros(n)
         if infer_rule == "k":
             x = np.matmul(adj_matrix_t, act_vec_old)
-        if infer_rule == "mk":
+        elif infer_rule == "mk":
             x = act_vec_old + np.matmul(adj_matrix_t, act_vec_old)
-        if infer_rule == "r":
-            x = (2 * act_vec_old - np.ones(n)) + np.matmul(adj_matrix_t, (2 * act_vec_old - np.ones(n)))
+        elif infer_rule == "r":
+            shifted_state = 2 * act_vec_old - ones
+            x = shifted_state + np.matmul(adj_matrix_t, shifted_state)
+        else:
+            x = np.zeros(n)
         act_vec_new = _transform_func(x, n, f_type)
         for c in scenario_concepts:
             act_vec_new[c] = level[c]
@@ -154,13 +160,14 @@ def cluster(file_location, aggregation_technique, clustering_method, n_clusters,
     def dynamic(agent, reference_fcm_arr):
         distance = 0
         distances = []
+        agent_nodes = list(agent.FCM.nodes())
         steady_state = _infer_steady(all_participants[agent.ID], n_concepts, f_type=f_type, infer_rule=infer_rule)
         reference_steady_state = _infer_steady(reference_fcm_arr, n_concepts, f_type=f_type, infer_rule=infer_rule)
         iteration = 0
         for _ in range(10):
             for _ in range(100):
                 sample_size = random.randint(1, n_concepts)
-                scenario_concepts = random.sample(list(agent.FCM.nodes()), sample_size)
+                scenario_concepts = random.sample(agent_nodes, sample_size)
                 scenario_levels = {rC: random.random() * random.choice([-1, 1]) for rC in scenario_concepts}
                 iteration += 1
                 scenario_state = _infer_scenario(scenario_concepts, scenario_levels, all_participants[agent.ID], n_concepts,
@@ -186,15 +193,10 @@ def cluster(file_location, aggregation_technique, clustering_method, n_clusters,
             adj_ag = np.zeros((n_concepts, n_concepts))
             for ag in agents:
                 adj_matrix = nx.to_numpy_array(ag.FCM)
-                for i in range(n_concepts):
-                    for j in range(n_concepts):
-                        if adj_matrix[i, j] != 0:
-                            count[i, j] += 1
+                count += adj_matrix != 0
                 adj += adj_matrix
                 adj_copy = np.copy(adj)
-                for i in range(n_concepts):
-                    for j in range(n_concepts):
-                        adj_ag[i, j] = 0 if count[i, j] == 0 else adj_copy[i, j] / count[i, j]
+                np.divide(adj_copy, count, out=adj_ag, where=count != 0)
             return adj_ag
         if method == "O":
             return np.ones((n_concepts, n_concepts))
@@ -220,7 +222,7 @@ def cluster(file_location, aggregation_technique, clustering_method, n_clusters,
     clusters = {i: [] for i in range(n_clusters)}
     for participant_id, label in assignments:
         print(participant_id, "is in cluster {}".format(label))
-        clusters[label].append(simil[participant_id])
+        clusters[label].append(similarities[participant_id])
 
     plt.figure(figsize=(10, 3))
     plt.rc('xtick', labelsize=14)
