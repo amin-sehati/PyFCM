@@ -5,11 +5,13 @@
          aminpour@msu.edu
 """
 
-import matplotlib.pyplot as plt
-import xlrd
-import numpy as np
-import networkx as nx
 from statistics import mean, median
+
+import matplotlib.pyplot as plt
+import networkx as nx
+import numpy as np
+import xlrd
+from scipy.stats.mstats import gmean
 
 
 def aggregate(file_location, aggregation_technique):
@@ -39,19 +41,19 @@ def aggregate(file_location, aggregation_technique):
     adj = np.zeros((n_concepts, n_concepts))
     count = np.zeros((n_concepts, n_concepts))
     adj_ag = np.zeros((n_concepts, n_concepts))
-    All_ADJs = []
+    all_adjs = []
 
     for i in range(workbook.nsheets):
         sheet = workbook.sheet_by_index(i)
-        Adj_matrix = np.zeros((n_concepts, n_concepts))
+        adj_matrix = np.zeros((n_concepts, n_concepts))
         for row in range(1, n_concepts + 1):
             for col in range(1, n_concepts + 1):
-                val = sheet.cell_value(row, col)
-                Adj_matrix[row - 1, col - 1] = val
-                if val != 0:
+                weight = sheet.cell_value(row, col)
+                adj_matrix[row - 1, col - 1] = weight
+                if weight != 0:
                     count[row - 1, col - 1] += 1
-        All_ADJs.append(Adj_matrix)
-        adj += Adj_matrix
+        all_adjs.append(adj_matrix)
+        adj += adj_matrix
 
     adj_copy = np.copy(adj)
 
@@ -63,21 +65,20 @@ def aggregate(file_location, aggregation_technique):
     elif aggregation_technique == "AMI":
         for i in range(n_concepts):
             for j in range(n_concepts):
-                a = [ind[i, j] for ind in All_ADJs]
-                adj_ag[i, j] = mean(a)
+                weights = [ind[i, j] for ind in all_adjs]
+                adj_ag[i, j] = mean(weights)
 
     elif aggregation_technique == "MED":
         for i in range(n_concepts):
             for j in range(n_concepts):
-                a = [ind[i, j] for ind in All_ADJs]
-                adj_ag[i, j] = median(a)
+                weights = [ind[i, j] for ind in all_adjs]
+                adj_ag[i, j] = median(weights)
 
     elif aggregation_technique == "GM":
-        import scipy.stats.mstats
         for i in range(n_concepts):
             for j in range(n_concepts):
-                a = [ind[i, j] for ind in All_ADJs if ind[i, j] != 0]
-                adj_ag[i, j] = float(scipy.stats.mstats.gmean(np.array(a)))
+                weights = [ind[i, j] for ind in all_adjs if ind[i, j] != 0]
+                adj_ag[i, j] = float(gmean(np.array(weights)))
 
     return adj_ag, sheet, n_concepts
 

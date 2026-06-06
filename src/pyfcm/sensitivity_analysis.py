@@ -5,23 +5,24 @@
          aminpour@msu.edu
 """
 
-import matplotlib.pyplot as plt
-import xlrd
-import numpy as np
 import math
+
+import matplotlib.pyplot as plt
 import networkx as nx
+import numpy as np
+import xlrd
 
 
-def _transform_func(x, n, f_type, landa=1):
+def _transform_func(x, n, f_type, lambda_=1):
     if f_type == "sig":
         x_new = np.zeros(n)
         for i in range(n):
-            x_new[i] = 1 / (1 + math.exp(-landa * x[i]))
+            x_new[i] = 1 / (1 + math.exp(-lambda_ * x[i]))
         return x_new
     if f_type == "tanh":
         x_new = np.zeros(n)
         for i in range(n):
-            x_new[i] = math.tanh(landa * x[i])
+            x_new[i] = math.tanh(lambda_ * x[i])
         return x_new
     if f_type == "bivalent":
         x_new = np.zeros(n)
@@ -40,38 +41,38 @@ def _transform_func(x, n, f_type, landa=1):
         return x_new
 
 
-def _infer_steady(Adj_matrix, n, init_vec, f_type, infer_rule, landa):
+def _infer_steady(adj_matrix, n, init_vec, f_type, infer_rule, lambda_):
     act_vec_old = init_vec.copy()
-    AdjmT = Adj_matrix.T
+    adj_matrix_t = adj_matrix.T
     resid = 1
     while resid > 0.00001:
         x = np.zeros(n)
         if infer_rule == "k":
-            x = np.matmul(AdjmT, act_vec_old)
+            x = np.matmul(adj_matrix_t, act_vec_old)
         if infer_rule == "mk":
-            x = act_vec_old + np.matmul(AdjmT, act_vec_old)
+            x = act_vec_old + np.matmul(adj_matrix_t, act_vec_old)
         if infer_rule == "r":
-            x = (2 * act_vec_old - np.ones(n)) + np.matmul(AdjmT, (2 * act_vec_old - np.ones(n)))
-        act_vec_new = _transform_func(x, n, f_type, landa)
+            x = (2 * act_vec_old - np.ones(n)) + np.matmul(adj_matrix_t, (2 * act_vec_old - np.ones(n)))
+        act_vec_new = _transform_func(x, n, f_type, lambda_)
         resid = max(abs(act_vec_new - act_vec_old))
         act_vec_old = act_vec_new
     return act_vec_new
 
 
-def _infer_scenario(Scenario_concept, Adj_matrix, n, init_vec, f_type, infer_rule, landa, changeLevel=1):
+def _infer_scenario(scenario_concept, adj_matrix, n, init_vec, f_type, infer_rule, lambda_, change_level=1):
     act_vec_old = init_vec.copy()
-    AdjmT = Adj_matrix.T
+    adj_matrix_t = adj_matrix.T
     resid = 1
     while resid > 0.00001:
         x = np.zeros(n)
         if infer_rule == "k":
-            x = np.matmul(AdjmT, act_vec_old)
+            x = np.matmul(adj_matrix_t, act_vec_old)
         if infer_rule == "mk":
-            x = act_vec_old + np.matmul(AdjmT, act_vec_old)
+            x = act_vec_old + np.matmul(adj_matrix_t, act_vec_old)
         if infer_rule == "r":
-            x = (2 * act_vec_old - np.ones(n)) + np.matmul(AdjmT, (2 * act_vec_old - np.ones(n)))
-        act_vec_new = _transform_func(x, n, f_type, landa)
-        act_vec_new[Scenario_concept] = changeLevel
+            x = (2 * act_vec_old - np.ones(n)) + np.matmul(adj_matrix_t, (2 * act_vec_old - np.ones(n)))
+        act_vec_new = _transform_func(x, n, f_type, lambda_)
+        act_vec_new[scenario_concept] = change_level
         resid = max(abs(act_vec_new - act_vec_old))
         act_vec_old = act_vec_new
     return act_vec_new
@@ -104,34 +105,34 @@ def run_sensitivity(file_location, noise_threshold, infer_rule, function_type, l
     sheet = workbook.sheet_by_index(0)
     n_concepts = sheet.nrows - 1
 
-    Adj_matrix = np.zeros((n_concepts, n_concepts))
+    adj_matrix = np.zeros((n_concepts, n_concepts))
     activation_vec = np.ones(n_concepts)
     node_name = {}
 
     for i in range(1, n_concepts + 1):
         for j in range(1, n_concepts + 1):
-            val = sheet.cell_value(i, j)
-            Adj_matrix[i - 1, j - 1] = 0 if abs(val) <= noise_threshold else val
+            weight = sheet.cell_value(i, j)
+            adj_matrix[i - 1, j - 1] = 0 if abs(weight) <= noise_threshold else weight
 
-    Concepts_matrix = [sheet.cell_value(0, i) for i in range(1, n_concepts + 1)]
-    G = nx.DiGraph(Adj_matrix)
+    concepts = [sheet.cell_value(0, i) for i in range(1, n_concepts + 1)]
+    G = nx.DiGraph(adj_matrix)
     for nod in G.nodes():
         node_name[nod] = sheet.cell_value(nod + 1, 0)
 
     prin_concepts_index = [nod for nod in node_name if node_name[nod] in principles]
 
-    SteadyState = _infer_steady(Adj_matrix, n_concepts, activation_vec, function_type, infer_rule, lambda_)
+    steady_state = _infer_steady(adj_matrix, n_concepts, activation_vec, function_type, infer_rule, lambda_)
 
     for name in scenario_variables:
-        Scenario_concept = Concepts_matrix.index(name)
+        scenario_concept = concepts.index(name)
         change_levels = np.linspace(0, 1, 21)
 
         change_in_principles = {pr: [] for pr in prin_concepts_index}
 
         for c in change_levels:
-            ScenarioState = _infer_scenario(Scenario_concept, Adj_matrix, n_concepts, activation_vec,
-                                            function_type, infer_rule, lambda_, changeLevel=c)
-            changes = ScenarioState - SteadyState
+            scenario_state = _infer_scenario(scenario_concept, adj_matrix, n_concepts, activation_vec,
+                                             function_type, infer_rule, lambda_, change_level=c)
+            changes = scenario_state - steady_state
             for pr in prin_concepts_index:
                 change_in_principles[pr].append(changes[pr])
 
