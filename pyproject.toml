@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyfcm"
+version = "0.1.0"
+authors = [
+    {name = "Payam Aminpour", email = "aminpour@msu.edu"},
+]
+description = "A Python package for Fuzzy Cognitive Map analysis: aggregation, clustering, scenario, sensitivity, and uncertainty analysis"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {file = "LICENSE.txt"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "matplotlib",
+    "xlrd<2.0",       # xlrd 2.0+ dropped .xlsx support; use openpyxl for newer xlrd
+    "numpy",
+    "networkx",
+    "scikit-learn",
+    "scipy",
+    "pandas",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
