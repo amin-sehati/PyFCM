@@ -8,7 +8,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from .simulation import infer_scenario, infer_steady, transform_func
+from .simulation import infer_scenario, infer_steady, make_initial_state, transform_func
 from .workbooks import concept_metadata, read_single_fcm
 
 
@@ -26,7 +26,7 @@ def _infer_scenario(scenario_concept, adj_matrix, n, init_vec, f_type, infer_rul
 
 
 def run_sensitivity(file_location, noise_threshold, infer_rule, function_type, lambda_,
-                    principles, scenario_variables):
+                    principles, scenario_variables, initial_state=1):
     """
     Run FCM sensitivity analysis: vary each scenario variable from 0 to 1 and
     plot how the system principles respond.
@@ -47,9 +47,11 @@ def run_sensitivity(file_location, noise_threshold, infer_rule, function_type, l
         Names of the key output concepts to track.
     scenario_variables : list of str
         Concept names to sweep as input variables.
+    initial_state : float or sequence
+        Initial activation state. A scalar is applied to all concepts.
     """
     adj_matrix, sheet, n_concepts = read_single_fcm(file_location, noise_threshold)
-    activation_vec = np.ones(n_concepts)
+    activation_vec = make_initial_state(initial_state, n_concepts)
     concepts, node_name, prin_concepts_index = concept_metadata(sheet, n_concepts, principles)
 
     steady_state = _infer_steady(adj_matrix, n_concepts, activation_vec, function_type, infer_rule, lambda_)

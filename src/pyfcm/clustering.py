@@ -14,7 +14,7 @@ import numpy as np
 from sklearn.cluster import KMeans
 
 from .aggregation import aggregate_matrices
-from .simulation import infer_scenario, infer_steady, transform_func
+from .simulation import infer_scenario, infer_steady, make_initial_state, transform_func
 from .workbooks import read_participant_fcms
 
 
@@ -51,7 +51,7 @@ def _similarity(agent_fcm, reference_fcm):
 
 
 def cluster(file_location, aggregation_technique, clustering_method, n_clusters,
-            f_type="tanh", infer_rule="k", function_type=None):
+            f_type="tanh", infer_rule="k", function_type=None, initial_state=1):
     """
     Cluster individual FCMs by structural or dynamic similarity.
 
@@ -70,6 +70,8 @@ def cluster(file_location, aggregation_technique, clustering_method, n_clusters,
         Backward-compatible alias for function_type.
     infer_rule : str
         Inference rule for dynamic clustering: 'k', 'mk', or 'r'.
+    initial_state : float or sequence
+        Initial activation state for dynamic clustering. A scalar is applied to all concepts.
 
     Returns
     -------
@@ -80,6 +82,7 @@ def cluster(file_location, aggregation_technique, clustering_method, n_clusters,
         f_type = function_type
 
     all_participants, participant_ids, matrices, _, n_concepts = read_participant_fcms(file_location)
+    activation_vec = make_initial_state(initial_state, n_concepts)
 
     class Agent:
         def __init__(self, ID):
@@ -90,8 +93,10 @@ def cluster(file_location, aggregation_technique, clustering_method, n_clusters,
         distance = 0
         distances = []
         agent_nodes = list(agent.FCM.nodes())
-        steady_state = _infer_steady(all_participants[agent.ID], n_concepts, f_type=f_type, infer_rule=infer_rule)
-        reference_steady_state = _infer_steady(reference_fcm_arr, n_concepts, f_type=f_type, infer_rule=infer_rule)
+        steady_state = _infer_steady(all_participants[agent.ID], n_concepts, init_vec=activation_vec,
+                                     f_type=f_type, infer_rule=infer_rule)
+        reference_steady_state = _infer_steady(reference_fcm_arr, n_concepts, init_vec=activation_vec,
+                                               f_type=f_type, infer_rule=infer_rule)
         iteration = 0
         for _ in range(10):
             for _ in range(100):
@@ -100,9 +105,9 @@ def cluster(file_location, aggregation_technique, clustering_method, n_clusters,
                 scenario_levels = {rC: random.random() * random.choice([-1, 1]) for rC in scenario_concepts}
                 iteration += 1
                 scenario_state = _infer_scenario(scenario_concepts, scenario_levels, all_participants[agent.ID], n_concepts,
-                                                f_type=f_type, infer_rule=infer_rule)
+                                                init_vec=activation_vec, f_type=f_type, infer_rule=infer_rule)
                 reference_scenario_state = _infer_scenario(scenario_concepts, scenario_levels, reference_fcm_arr, n_concepts,
-                                                    f_type=f_type, infer_rule=infer_rule)
+                                                    init_vec=activation_vec, f_type=f_type, infer_rule=infer_rule)
                 change = scenario_state - steady_state
                 reference_change = reference_scenario_state - reference_steady_state
                 distance += sum((change - reference_change) ** 2)

@@ -4,6 +4,18 @@
 import numpy as np
 
 
+def make_initial_state(initial_state, n):
+    if initial_state is None:
+        return np.ones(n)
+    if np.isscalar(initial_state):
+        return np.full(n, initial_state, dtype=float)
+
+    init_vec = np.asarray(initial_state, dtype=float)
+    if len(init_vec) != n:
+        raise ValueError("initial_state must be a scalar or have one value per concept")
+    return init_vec
+
+
 def transform_func(x, n, function_type, lambda_=1):
     x = np.asarray(x)[:n]
     if function_type == "sig":
@@ -18,8 +30,7 @@ def transform_func(x, n, function_type, lambda_=1):
 
 def infer_steady(adj_matrix, n, init_vec=None, function_type="tanh",
                  infer_rule="k", lambda_=1, tolerance=0.00001):
-    if init_vec is None:
-        init_vec = np.ones(n)
+    init_vec = make_initial_state(init_vec, n)
     act_vec_old = init_vec.copy()
     adj_matrix_t = adj_matrix.T
     resid = 1
@@ -45,8 +56,7 @@ def infer_steady(adj_matrix, n, init_vec=None, function_type="tanh",
 def infer_scenario(scenario_concepts, levels, adj_matrix, n, init_vec=None,
                    function_type="tanh", infer_rule="k", lambda_=1,
                    tolerance=0.00001, zero_concepts=None):
-    if init_vec is None:
-        init_vec = np.ones(n)
+    init_vec = make_initial_state(init_vec, n)
     if zero_concepts is None:
         zero_concepts = []
     act_vec_old = init_vec.copy()

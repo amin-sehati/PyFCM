@@ -144,7 +144,7 @@ Public function:
 
 ```python
 cluster(file_location, aggregation_technique, clustering_method, n_clusters,
-        f_type="tanh", infer_rule="k", function_type=None)
+        f_type="tanh", infer_rule="k", function_type=None, initial_state=1)
 ```
 
 Inputs:
@@ -169,6 +169,9 @@ Inputs:
   - `"k"`: Kosko rule.
   - `"mk"`: modified Kosko rule.
   - `"r"`: rescaled rule.
+- `initial_state`: starting activation state for dynamic clustering. A scalar
+  applies to all concepts; a sequence must have one value per concept. Default
+  is `1`.
 
 Outputs:
 
@@ -202,6 +205,7 @@ clusters, assignments = cluster(
     n_clusters=3,
     function_type="tanh",
     infer_rule="k",
+    initial_state=0.5,
 )
 ```
 
@@ -220,7 +224,7 @@ Public function:
 
 ```python
 run_scenario(file_location, noise_threshold, infer_rule, function_type, lambda_,
-             principles, change_levels, show="A")
+             principles, change_levels, show="A", initial_state=1)
 ```
 
 Inputs:
@@ -231,6 +235,8 @@ Inputs:
 - `function_type`: `"sig"`, `"tanh"`, `"bivalent"`, or `"trivalent"`.
 - `lambda_`: squashing-function steepness.
 - `principles`: concept names to track as important output concepts.
+- `initial_state`: starting activation state. A scalar applies to all concepts;
+  a sequence must have one value per concept. Default is `1`.
 - `change_levels`: dictionary of forced scenario values:
 
 ```python
@@ -263,6 +269,7 @@ changes = run_scenario(
     principles=["Sustainability", "Cost"],
     change_levels={"Policy Support": 0.8, "Funding": 0.5},
     show="P",
+    initial_state=0.5,
 )
 ```
 
@@ -280,7 +287,7 @@ Public function:
 
 ```python
 run_sensitivity(file_location, noise_threshold, infer_rule, function_type,
-                lambda_, principles, scenario_variables)
+                lambda_, principles, scenario_variables, initial_state=1)
 ```
 
 Inputs:
@@ -292,6 +299,8 @@ Inputs:
 - `lambda_`: squashing-function steepness.
 - `principles`: output concept names to track.
 - `scenario_variables`: input concept names to sweep from 0 to 1.
+- `initial_state`: starting activation state. A scalar applies to all concepts;
+  a sequence must have one value per concept. Default is `1`.
 
 Output:
 
@@ -311,6 +320,7 @@ run_sensitivity(
     lambda_=1,
     principles=["Sustainability", "Cost"],
     scenario_variables=["Policy Support", "Funding"],
+    initial_state=0.5,
 )
 ```
 
@@ -329,7 +339,7 @@ Public function:
 
 ```python
 run_uncertainty(file_location, noise_threshold, infer_rule, function_type,
-                lambda_, principles, thresh, n_iteration)
+                lambda_, principles, thresh, n_iteration, initial_state=1)
 ```
 
 Inputs:
@@ -343,6 +353,8 @@ Inputs:
 - `thresh`: maximum in-degree for a concept to be eligible as a randomly
   activated input node.
 - `n_iteration`: number of random scenario runs.
+- `initial_state`: starting activation state. A scalar applies to all concepts;
+  a sequence must have one value per concept. Default is `1`.
 
 Output:
 
@@ -369,6 +381,7 @@ df = run_uncertainty(
     principles=["Sustainability", "Cost"],
     thresh=2,
     n_iteration=100,
+    initial_state=0.5,
 )
 ```
 
@@ -382,6 +395,12 @@ Reusable lower-level FCM simulation functions.
 
 These are useful if you already have an adjacency matrix and want to run the FCM
 logic directly without using the higher-level Excel workflows.
+
+```python
+make_initial_state(initial_state, n)
+```
+
+Creates an initial activation vector from either a scalar or a sequence.
 
 ```python
 transform_func(x, n, function_type, lambda_=1)
@@ -424,6 +443,11 @@ scenario = infer_scenario(
     function_type="tanh",
 )
 ```
+
+All high-level workflows default to `initial_state=1`, matching earlier PyFCM
+behavior. Pass a scalar such as `initial_state=0.5` to start every concept at
+that value, or pass a sequence with one value per concept for a custom initial
+vector.
 
 ### `workbooks.py`
 

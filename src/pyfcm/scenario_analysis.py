@@ -8,7 +8,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from .simulation import infer_scenario, infer_steady, transform_func
+from .simulation import infer_scenario, infer_steady, make_initial_state, transform_func
 from .workbooks import concept_metadata, read_single_fcm
 
 
@@ -26,7 +26,7 @@ def _infer_scenario(scenario_concepts, change_level, adj_matrix, n, init_vec, f_
 
 
 def run_scenario(file_location, noise_threshold, infer_rule, function_type, lambda_,
-                 principles, change_levels, show='A'):
+                 principles, change_levels, show='A', initial_state=1):
     """
     Run an FCM scenario analysis.
 
@@ -48,13 +48,15 @@ def run_scenario(file_location, noise_threshold, infer_rule, function_type, lamb
         {concept_name: activation_level} for each scenario variable.
     show : str
         'A' to plot all concepts, 'P' to plot principles only.
+    initial_state : float or sequence
+        Initial activation state. A scalar is applied to all concepts.
 
     Returns
     -------
     changes_dic : dict  {concept_name: change_value}
     """
     adj_matrix, sheet, n_concepts = read_single_fcm(file_location, noise_threshold)
-    activation_vec = np.ones(n_concepts)
+    activation_vec = make_initial_state(initial_state, n_concepts)
     concepts, node_name, prin_concepts_index = concept_metadata(sheet, n_concepts, principles)
 
     change_level_by_index = {concepts.index(name): lvl for name, lvl in change_levels.items()}

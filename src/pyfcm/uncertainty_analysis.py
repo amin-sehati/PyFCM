@@ -13,7 +13,7 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 
-from .simulation import infer_scenario, infer_steady, transform_func
+from .simulation import infer_scenario, infer_steady, make_initial_state, transform_func
 from .workbooks import concept_metadata, read_single_fcm
 
 
@@ -32,7 +32,7 @@ def _infer_scenario(scenario_concepts, zero_concepts, adj_matrix, n, init_vec, f
 
 
 def run_uncertainty(file_location, noise_threshold, infer_rule, function_type, lambda_,
-                    principles, thresh, n_iteration):
+                    principles, thresh, n_iteration, initial_state=1):
     """
     Run FCM uncertainty analysis via Monte Carlo sampling of input combinations.
 
@@ -54,13 +54,15 @@ def run_uncertainty(file_location, noise_threshold, infer_rule, function_type, l
         Maximum in-degree for a concept to be eligible as a randomly activated node.
     n_iteration : int
         Number of Monte Carlo iterations.
+    initial_state : float or sequence
+        Initial activation state. A scalar is applied to all concepts.
 
     Returns
     -------
     df : pd.DataFrame  with columns [IDS, <principle_names...>]
     """
     adj_matrix, sheet, n_concepts = read_single_fcm(file_location, noise_threshold)
-    activation_vec = np.ones(n_concepts)
+    activation_vec = make_initial_state(initial_state, n_concepts)
     concepts, node_name, prin_concepts_index = concept_metadata(sheet, n_concepts, principles)
     G = nx.DiGraph(adj_matrix)
 
